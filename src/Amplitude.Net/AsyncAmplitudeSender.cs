@@ -21,7 +21,7 @@ public class AsyncAmplitudeSender : IAmplitudeSender
     public AsyncAmplitudeSender(IHttpClientFactory httpClientFactory, IOptions<AmplitudeOptions> options)
     {
         _httpClientFactory = httpClientFactory;
-        _apiKey = options.Value.ApiKey;
+        _apiKey = options?.Value?.ApiKey ?? throw new ArgumentException("No api key provided.");
         _queue = new ConcurrentQueue<(HttpRequestMessage, ILogger)>();
         _timer = new Timer(TimeSpan.FromMilliseconds(50));
         _timer.AutoReset = true;

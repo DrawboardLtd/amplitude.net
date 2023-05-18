@@ -18,6 +18,12 @@ public static class ServiceCollectionExtensions
                         $"Amplitude configuration not found. You must provide a \"{AmplitudeOptions.Section}\" configuration section.");
                 }
 
+                if (ampOptions.ApiKey == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Amplitude configuration was found but no ApiKey was provided");
+                }
+
                 options.ApiKey = ampOptions.ApiKey;
             });
 
