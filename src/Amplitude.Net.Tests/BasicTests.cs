@@ -19,7 +19,7 @@ public class BasicTests
     {
         ConfigurationBuilder configBuilder = new ConfigurationBuilder();
         configBuilder.AddJsonFile("appsettings.json", optional: true);
-        configBuilder.AddEnvironmentVariables("tests");
+        configBuilder.AddEnvironmentVariables("tests_");
         var configuration = configBuilder.Build();
         
         var ampConfigSection = configuration.GetSection(AmplitudeOptions.Section);
