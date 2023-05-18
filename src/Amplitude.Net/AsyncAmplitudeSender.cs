@@ -61,7 +61,7 @@ public class AsyncAmplitudeSender : IAmplitudeSender
         response.EnsureSuccessStatusCode();
     }
 
-    public ValueTask Identify(IDictionary<string, object> payload, ILogger logger)
+    public ValueTask Identify(IDictionary<string, object?> payload, ILogger logger)
     {
         const string url = "https://api2.amplitude.com/identify";
         var identificationBody = JsonSerializer.Serialize(payload);
@@ -73,6 +73,8 @@ public class AsyncAmplitudeSender : IAmplitudeSender
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         httpRequest.Content = requestBody;
         
-        throw new NotImplementedException();
+        _queue.Enqueue((httpRequest, logger));
+        
+        return ValueTask.CompletedTask;
     }
 }

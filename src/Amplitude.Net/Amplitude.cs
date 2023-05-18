@@ -16,9 +16,11 @@ public class Amplitude : IAmplitude
         _sender = sender;
     }
 
-    public Task IdentifyByUserId(string userId, IDictionary<string, object> userProperties = default, string appVersion = IAmplitude.UNSET,
-        string language = IAmplitude.UNSET, string paying = IAmplitude.UNSET, string startVersion = IAmplitude.UNSET, DeviceInfo? deviceInfo = default,
-        LocationInfo locationInfo = default)
+    public ValueTask IdentifyByUserId(string userId, IDictionary<string, object>? userProperties = null,
+        string? appVersion = "UNSET",
+        string? language = "UNSET", string? paying = "UNSET", string? startVersion = "UNSET",
+        DeviceInfo? deviceInfo = null,
+        LocationInfo? locationInfo = null)
     {
         var payload = new Dictionary<string, object>();
         payload.Add("user_id", userId);
@@ -26,19 +28,21 @@ public class Amplitude : IAmplitude
         return Identify(payload, userProperties, appVersion, language, paying, startVersion, deviceInfo, locationInfo);
     }
 
-    public Task IdentifyByDeviceId(string deviceId, IDictionary<string, object> userProperties = default, string appVersion = IAmplitude.UNSET,
-        string language = IAmplitude.UNSET, string paying = IAmplitude.UNSET, string startVersion = IAmplitude.UNSET, DeviceInfo? deviceInfo = default,
-        LocationInfo locationInfo = default)
+    public ValueTask IdentifyByDeviceId(string deviceId, IDictionary<string, object>? userProperties = null,
+        string? appVersion = "UNSET",
+        string? language = "UNSET", string? paying = "UNSET", string? startVersion = "UNSET",
+        DeviceInfo? deviceInfo = null,
+        LocationInfo? locationInfo = null)
     {
-        var payload = new Dictionary<string, object>();
+        var payload = new Dictionary<string, object?>();
         payload.Add("device_id", deviceId);
 
         return Identify(payload, userProperties, appVersion, language, paying, startVersion, deviceInfo, locationInfo);
     }
 
-    private async Task Identify(IDictionary<string, object> payload, IDictionary<string, object> userProperties = default,
-        string appVersion = IAmplitude.UNSET,
-        string language = IAmplitude.UNSET, string paying = IAmplitude.UNSET, string startVersion = IAmplitude.UNSET, DeviceInfo? deviceInfo = default,
+    private async ValueTask Identify(IDictionary<string, object?> payload, IDictionary<string, object>? userProperties = default,
+        string? appVersion = IAmplitude.UNSET,
+        string? language = IAmplitude.UNSET, string? paying = IAmplitude.UNSET, string? startVersion = IAmplitude.UNSET, DeviceInfo? deviceInfo = default,
         LocationInfo? locationInfo = default)
     {
         if (userProperties != null)
