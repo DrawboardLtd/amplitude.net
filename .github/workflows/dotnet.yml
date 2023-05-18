@@ -1,0 +1,44 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: Amplitude.Net
+
+on:
+  create:
+    branches: 
+      - release/**
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: src
+    - name: Build
+      if: startsWith(github.ref, 'refs/heads/release')
+      run: dotnet build --no-restore -p:Version=${{env.GITHUB_REF_NAME}}
+      working-directory: src
+    - name: Build
+      if: startsWith(github.ref, 'refs/heads/release') != true
+      run: dotnet build --no-restore
+      working-directory: src
+    - name: Test
+      env:
+        tests_Amplitude__ApiKey: ${{ secrets.AMPLITUDE_KEY }}
+      run: dotnet test --no-restore
+      working-directory: src/Amplitude.Net.Tests
+    - name: Publish
+      if: startsWith(github.ref, 'refs/heads/release')
+      run: nuget push **\*.nupkg -Source 'https://api.nuget.org/v3/index.json' -ApiKey ${{secrets.NUGET_KEY}}

@@ -4,6 +4,13 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>Amplitude.Net</PackageId>
+    <Version>0.0.1</Version>
+    <Authors>Sam Critchley</Authors>
+    <Company>Drawboard</Company>
+    <PackageDescription>.Net library for interacting with Amplitude's api</PackageDescription>
+    <RepositoryUrl>https://github.com/DrawboardLtd/amplitude.net</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
