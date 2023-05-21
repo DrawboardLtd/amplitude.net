@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Amplitude.Net", "Amplitude.Net\Amplitude.Net.csproj", "{FE931292-0A05-44ED-ADDF-03ED6E8377E3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Amplitude.Net.Tests", "Amplitude.Net.Tests\Amplitude.Net.Tests.csproj", "{C2A35762-525E-441E-940C-E5EBA8E73375}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{FE931292-0A05-44ED-ADDF-03ED6E8377E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE931292-0A05-44ED-ADDF-03ED6E8377E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FE931292-0A05-44ED-ADDF-03ED6E8377E3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2A35762-525E-441E-940C-E5EBA8E73375}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2A35762-525E-441E-940C-E5EBA8E73375}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2A35762-525E-441E-940C-E5EBA8E73375}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2A35762-525E-441E-940C-E5EBA8E73375}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

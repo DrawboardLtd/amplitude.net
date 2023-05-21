@@ -10,7 +10,7 @@ namespace Amplitude.Net;
 /// <summary>
 /// Asynchronously delivers requests to Amplitude. Designed to be a singleton.
 /// </summary>
-public class AsyncAmplitudeSender : IAmplitudeSender
+public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _apiKey;
@@ -18,15 +18,21 @@ public class AsyncAmplitudeSender : IAmplitudeSender
     private readonly Timer _timer;
     private readonly SemaphoreSlim _concurrencySemaphore;
 
-    public AsyncAmplitudeSender(IHttpClientFactory httpClientFactory, IOptions<AmplitudeOptions> options)
+    public AsyncAmplitudeSender(IHttpClientFactory httpClientFactory, string apiKey)
     {
         _httpClientFactory = httpClientFactory;
-        _apiKey = options?.Value?.ApiKey ?? throw new ArgumentException("No api key provided.");
+        _apiKey = apiKey;
         _queue = new ConcurrentQueue<(HttpRequestMessage, ILogger)>();
         _timer = new Timer(TimeSpan.FromMilliseconds(50));
         _timer.AutoReset = true;
         _timer.Elapsed += TimerOnElapsed;
+        _timer.Start();
         _concurrencySemaphore = new SemaphoreSlim(10);
+    }
+    
+    public AsyncAmplitudeSender(IHttpClientFactory httpClientFactory, IOptions<AmplitudeOptions> options)
+    :this(httpClientFactory, options?.Value?.ApiKey ?? throw new ArgumentException("No api key provided."))
+    {
     }
 
     private async void TimerOnElapsed(object? sender, ElapsedEventArgs e)
@@ -40,7 +46,9 @@ public class AsyncAmplitudeSender : IAmplitudeSender
             {
                 try
                 {
+                    request.Logger.LogTrace("Sending Amplitude request");
                     await SendRequest(request.Request);
+                    request.Logger.LogTrace("Amplitude request sent");
                 }
                 catch(Exception ex)
                 {
@@ -56,7 +64,7 @@ public class AsyncAmplitudeSender : IAmplitudeSender
 
     private async Task SendRequest(HttpRequestMessage requestMessage)
     {
-        var httpClient = _httpClientFactory.CreateClient();
+        using var httpClient = _httpClientFactory.CreateClient();
         var response = await httpClient.SendAsync(requestMessage);
         response.EnsureSuccessStatusCode();
     }
@@ -76,5 +84,19 @@ public class AsyncAmplitudeSender : IAmplitudeSender
         _queue.Enqueue((httpRequest, logger));
         
         return ValueTask.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _timer.Dispose();
+        _concurrencySemaphore.Dispose();
+
+        while (!_queue.IsEmpty)
+        {
+            if (_queue.TryDequeue(out var request))
+            {
+                await SendRequest(request.Request);
+            }
+        }
     }
 }
