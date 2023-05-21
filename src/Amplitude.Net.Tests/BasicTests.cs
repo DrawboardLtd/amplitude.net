@@ -12,7 +12,6 @@ namespace Amplitude.Net.Tests;
 
 public class BasicTests
 {
-    private readonly AmplitudeOptions? _ampOptions;
     private readonly IOptions<AmplitudeOptions> _optionsWrapper;
 
     public BasicTests()

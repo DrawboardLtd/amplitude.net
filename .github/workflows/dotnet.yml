@@ -26,12 +26,15 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
       working-directory: src
+    # - name: whatever
+    #   shell: bash
+    #   run: echo "YAML CI is the 9th circle of hell ${{github.ref}}"
     - name: Build
-      if: startsWith(github.ref, 'refs/heads/release')
+      if: ${{ startsWith(github.ref, 'refs/heads/release') }}
       run: dotnet build --no-restore -p:Version=${{env.GITHUB_REF_NAME}}
       working-directory: src
     - name: Build
-      if: startsWith(github.ref, 'refs/heads/release') != true
+      if: ${{ startsWith(github.ref, 'refs/heads/release') != true }}
       run: dotnet build --no-restore
       working-directory: src
     - name: Test
@@ -40,5 +43,5 @@ jobs:
       run: dotnet test --no-restore
       working-directory: src/Amplitude.Net.Tests
     - name: Publish
-      if: startsWith(github.ref, 'refs/heads/release')
+      if: ${{ startsWith(github.ref, 'refs/heads/release') }}
       run: nuget push **\*.nupkg -Source 'https://api.nuget.org/v3/index.json' -ApiKey ${{secrets.NUGET_KEY}}
