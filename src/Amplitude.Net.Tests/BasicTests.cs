@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using Shouldly;
 using Xunit;
 
 namespace Amplitude.Net.Tests;
@@ -46,5 +47,16 @@ public class BasicTests
         await Task.Delay(TimeSpan.FromMilliseconds(1000));
         
         httpFactory.Received().CreateClient();
+    }
+
+    [Fact]
+    public void AssertOptionalAsMethodArgDefaultBehaves()
+    {
+        void Test(Optional<bool> arg = default)
+        {
+            arg.HasValue.ShouldBeFalse();
+        }
+
+        Test();
     }
 }

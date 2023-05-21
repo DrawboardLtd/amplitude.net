@@ -5,4 +5,5 @@ namespace Amplitude.Net;
 public interface IAmplitudeSender
 {
     ValueTask Identify(IDictionary<string, object?> payload, ILogger logger);
+    ValueTask Event(IDictionary<string, object?> payload, ILogger logger);
 }

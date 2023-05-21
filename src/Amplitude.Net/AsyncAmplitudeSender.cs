@@ -89,6 +89,23 @@ public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
         
         return ValueTask.CompletedTask;
     }
+    
+    public ValueTask Event(IDictionary<string, object?> payload, ILogger logger)
+    {
+        const string url = "https://api2.amplitude.com/2/httpapi";
+        var eventBody = JsonSerializer.Serialize(new [] {payload});
+        var requestBody = new FormUrlEncodedContent(new KeyValuePair<string, string>[]
+        {
+            new("api_key", _apiKey),
+            new("events", eventBody)
+        });
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+        httpRequest.Content = requestBody;
+        
+        _queue.Enqueue((httpRequest, logger));
+        
+        return ValueTask.CompletedTask;
+    }
 
     public async ValueTask DisposeAsync()
     {
