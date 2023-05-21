@@ -23,7 +23,11 @@ public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
         _httpClientFactory = httpClientFactory;
         _apiKey = apiKey;
         _queue = new ConcurrentQueue<(HttpRequestMessage, ILogger)>();
+#if NET70
         _timer = new Timer(TimeSpan.FromMilliseconds(50));
+#else
+        _timer = new Timer(TimeSpan.FromMilliseconds(50).TotalMilliseconds);
+#endif
         _timer.AutoReset = true;
         _timer.Elapsed += TimerOnElapsed;
         _timer.Start();
