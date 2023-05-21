@@ -32,11 +32,11 @@ jobs:
     - name: Build
       if: ${{ startsWith(github.ref, 'refs/tags') }}
       run: dotnet build --no-restore -p:Version=${{github.ref_name}}
-      working-directory: src
+      working-directory: src/Amplitude.Net
     - name: Build
       if: ${{ startsWith(github.ref, 'refs/tags') != true }}
       run: dotnet build --no-restore
-      working-directory: src
+      working-directory: src/Amplitude.Net
     - name: Test
       env:
         tests_Amplitude__ApiKey: ${{ secrets.AMPLITUDE_KEY }}
