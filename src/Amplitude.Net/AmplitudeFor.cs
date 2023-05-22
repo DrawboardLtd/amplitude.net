@@ -2,6 +2,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Amplitude.Net;
 
+#if (NETSTANDARD2_0)
+using ReturnType = Task;
+#else
+using ReturnType = ValueTask;
+#endif
+
 public abstract class AmplitudeFor: IAmplitudeForTarget
 {
     private readonly ILogger _logger;
@@ -15,45 +21,47 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
         _identifier = identifier!;
     }
     
-    public async ValueTask Identify(IDictionary<string, object>? userProperties = default,
-        string? appVersion = IAmplitude.UNSET,
-        string? language = IAmplitude.UNSET, string? paying = IAmplitude.UNSET, string? startVersion = IAmplitude.UNSET, DeviceInfo? deviceInfo = default,
+    public async ReturnType Identify(IDictionary<string, object>? userProperties = default,
+        Optional<string?> appVersion = default,
+        Optional<string?> language = default, Optional<string?> paying = default, Optional<string?> startVersion = default, DeviceInfo? deviceInfo = default,
         LocationInfo? locationInfo = default)
     {
-        var payload = new Dictionary<string, object?>(new [] {_identifier});
+        var payload = new Dictionary<string, object?>
+        {
+            {_identifier.Key, _identifier.Value}
+        };
+        
+        void WriteOptional<T>(Optional<T> value, string key)
+        {
+            if (value.HasValue)
+            {
+                payload.Add(key, value.Value);
+            }
+        }
         
         if (userProperties != null)
         {
             payload.Add("user_properties", userProperties);
         }
+        
+        WriteOptional(appVersion, "app_version");
+        WriteOptional(language, "language");
+        
 
-        if (appVersion != IAmplitude.UNSET)
+        if (paying.HasValue)
         {
-            payload.Add("app_version", appVersion);
-        }
-        
-        if (language != IAmplitude.UNSET)
-        {
-            payload.Add("language", language);
-        }
-        
-        if (paying != IAmplitude.UNSET)
-        {
-            if (string.IsNullOrEmpty(paying) || paying == "none")
+            if (string.IsNullOrEmpty(paying.Value) || paying.Value == "none")
             {
-                payload.Add("paying", paying);
+                payload.Add("paying", paying.Value);
             }
             else
             {
-                throw new InvalidDataException($"The value {paying} provided for 'paying' is invalid");
+                throw new InvalidDataException($"The value {paying.Value} provided for 'paying' is invalid");
             }
         }
         
-        if (startVersion != IAmplitude.UNSET)
-        {
-            payload.Add("start_version", startVersion);
-        }
-
+        WriteOptional(startVersion, "start_version");
+        
         if (deviceInfo != null)
         {
             payload.Add("os_name", deviceInfo.OsName.Value);
@@ -76,14 +84,18 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
         await _amplitudeSender.Identify(payload, _logger);
     }
 
-    public async ValueTask Event(string eventType, Optional<DateTime> time = default, IDictionary<string, object>? eventProperties = default,
+    public async ReturnType Event(string eventType, Optional<DateTime> time = default, IDictionary<string, object>? eventProperties = default,
         IDictionary<string, object>? userProperties = default, Optional<bool> skipUserPropertiesSync = default, Optional<string> appVersion = default,
         DeviceInfo? deviceInfo = default, LocationInfo? locationInfo = default, TransactionInfo? transactionInfo = default,
         Optional<string> ip = default, Optional<decimal> locationLatitude = default, Optional<decimal> locationLongitude = default, 
         AdvertiserIds? advertiserIds = default, Optional<int> eventId = default, Optional<long> sessionId = default, Optional<string> insertId = default, 
         PlanInfo? planInfo = default)
     {
-        var payload = new Dictionary<string, object?>(new [] {_identifier, new KeyValuePair<string, object?>("event_type", eventType)});
+        var payload = new Dictionary<string, object?>
+        {
+            {_identifier.Key, _identifier.Value},
+            {"event_type", eventType}
+        };
         
         void WriteOptional<T>(Optional<T> value, string key)
         {
@@ -105,7 +117,7 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
         
         if (time.HasValue)
         {
-            payload.Add("time", time.Value.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
+            payload.Add("time", time.Value.Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds);
         }
         
         if (eventProperties != null)

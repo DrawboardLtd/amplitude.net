@@ -1,5 +1,9 @@
 ﻿using System.Collections.Concurrent;
+#if NETSTANDARD2_0
+using Newtonsoft.Json;
+#else
 using System.Text.Json;
+#endif
 using System.Timers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,10 +11,21 @@ using Timer = System.Timers.Timer;
 
 namespace Amplitude.Net;
 
+#if (NETSTANDARD2_0)
+using ReturnType = Task;
+#else
+using ReturnType = ValueTask;
+#endif
+
 /// <summary>
 /// Asynchronously delivers requests to Amplitude. Designed to be a singleton.
 /// </summary>
-public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
+public class AsyncAmplitudeSender : IAmplitudeSender, 
+#if NETSTANDARD2_0
+    IDisposable
+    #else
+    IAsyncDisposable
+    #endif
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _apiKey;
@@ -46,19 +61,17 @@ public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
         await _concurrencySemaphore.WaitAsync();
         try
         {
-            if (_queue.TryDequeue(out var request))
+            if (!_queue.TryDequeue(out var request)) return;
+            try
             {
-                try
-                {
-                    request.Logger.LogTrace("Sending Amplitude request");
-                    await SendRequest(request.Request);
-                    request.Logger.LogTrace("Amplitude request sent");
-                }
-                catch(Exception ex)
-                {
-                    request.Logger.LogError(ex, "Error delivering amplitude request");
-                }
-            }            
+                request.Logger.LogTrace("Sending Amplitude request");
+                await SendRequest(request.Request);
+                request.Logger.LogTrace("Amplitude request sent");
+            }
+            catch(Exception ex)
+            {
+                request.Logger.LogError(ex, "Error delivering amplitude request");
+            }
         }
         finally
         {
@@ -73,10 +86,15 @@ public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
         response.EnsureSuccessStatusCode();
     }
 
-    public ValueTask Identify(IDictionary<string, object?> payload, ILogger logger)
+    public ReturnType Identify(IDictionary<string, object?> payload, ILogger logger)
     {
         const string url = "https://api2.amplitude.com/identify";
+#if NETSTANDARD2_0
+        var identificationBody = JsonConvert.SerializeObject(payload);
+#else
         var identificationBody = JsonSerializer.Serialize(payload);
+#endif
+        
         var requestBody = new FormUrlEncodedContent(new KeyValuePair<string, string>[]
         {
             new("api_key", _apiKey),
@@ -87,13 +105,18 @@ public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
         
         _queue.Enqueue((httpRequest, logger));
         
-        return ValueTask.CompletedTask;
+        return ReturnType.CompletedTask;
     }
     
-    public ValueTask Event(IDictionary<string, object?> payload, ILogger logger)
+    public ReturnType Event(IDictionary<string, object?> payload, ILogger logger)
     {
         const string url = "https://api2.amplitude.com/2/httpapi";
+#if NETSTANDARD2_0
+        var eventBody = JsonConvert.SerializeObject(new [] {payload});
+#else
         var eventBody = JsonSerializer.Serialize(new [] {payload});
+#endif
+        
         var requestBody = new FormUrlEncodedContent(new KeyValuePair<string, string>[]
         {
             new("api_key", _apiKey),
@@ -104,9 +127,24 @@ public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
         
         _queue.Enqueue((httpRequest, logger));
         
-        return ValueTask.CompletedTask;
+        return ReturnType.CompletedTask;
     }
 
+#if NETSTANDARD2_0
+    public void Dispose()
+    {
+        _timer.Dispose();
+        _concurrencySemaphore.Dispose();
+        
+        while (!_queue.IsEmpty)
+        {
+            if (_queue.TryDequeue(out var request))
+            {
+                Task.WaitAll(SendRequest(request.Request));
+            }
+        }
+    }
+#else
     public async ValueTask DisposeAsync()
     {
         _timer.Dispose();
@@ -120,4 +158,5 @@ public class AsyncAmplitudeSender : IAmplitudeSender, IAsyncDisposable
             }
         }
     }
+#endif
 }

@@ -51,7 +51,13 @@ public struct Optional<T>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(value, HasValue);
+        unchecked // Allow arithmetic overflow, numbers will just "wrap around"
+        {
+            int hashcode = 1430287;
+            hashcode = hashcode * 7302013 ^ (value?.GetHashCode() ?? 0);
+            hashcode = hashcode * 7302013 ^ HasValue.GetHashCode();
+            return hashcode;
+        }
     }
 
     public bool Equals(Optional<T> other)
