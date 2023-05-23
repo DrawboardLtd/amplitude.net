@@ -267,9 +267,17 @@ public class AsyncAmplitudeSender : IAmplitudeSender,
         _identifyTimer.Dispose();
         _identifySemaphore.Dispose();
         
+        _eventTimer.Dispose();
+        _eventSemaphore.Dispose();
+        
         while (!_identifyQueue.IsEmpty)
         {
             Task.WaitAll(ProcessIdentifyQueue());
+        }
+
+        while (!_eventQueue.IsEmpty)
+        {
+            Task.WaitAll(ProcessEventQueue());
         }
     }
 #else
@@ -277,10 +285,18 @@ public class AsyncAmplitudeSender : IAmplitudeSender,
     {
         _identifyTimer.Dispose();
         _identifySemaphore.Dispose();
+        
+        _eventTimer.Dispose();
+        _eventSemaphore.Dispose();
 
         while (!_identifyQueue.IsEmpty)
         {
             await ProcessIdentifyQueue();
+        }
+        
+        while (!_eventQueue.IsEmpty)
+        {
+            await ProcessEventQueue();
         }
     }
 #endif
