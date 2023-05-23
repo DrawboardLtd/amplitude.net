@@ -83,7 +83,7 @@ public class AsyncAmplitudeSender : IAmplitudeSender,
     private async Task ProcessIdentifyQueue()
     {
         if (_identifyQueue.IsEmpty) return;
-        await _identifySemaphore.WaitAsync();
+        if (!await _identifySemaphore.WaitAsync(TimeSpan.FromMilliseconds(50))) return;
         try
         {
             const int max = 20;
@@ -115,7 +115,8 @@ public class AsyncAmplitudeSender : IAmplitudeSender,
     private async Task ProcessEventQueue()
     {
         if (_eventQueue.IsEmpty) return;
-        await _eventSemaphore.WaitAsync();
+        if (!await _eventSemaphore.WaitAsync(TimeSpan.FromMilliseconds(50))) return;
+            
         try
         {
             const int max = 20;
