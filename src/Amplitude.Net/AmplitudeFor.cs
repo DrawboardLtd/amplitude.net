@@ -12,13 +12,13 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
 {
     private readonly ILogger _logger;
     private readonly IAmplitudeSender _amplitudeSender;
-    private readonly KeyValuePair<string, object?> _identifier;
-
-    protected AmplitudeFor(ILogger logger, IAmplitudeSender amplitudeSender, KeyValuePair<string, object> identifier)
+    private readonly IEnumerable<KeyValuePair<string, object?>> _identifiers;
+    
+    protected AmplitudeFor(ILogger logger, IAmplitudeSender amplitudeSender, IEnumerable<KeyValuePair<string, object?>> identifiers)
     {
         _logger = logger;
         _amplitudeSender = amplitudeSender;
-        _identifier = identifier!;
+        _identifiers = identifiers;
     }
     
     public async ReturnType Identify(IDictionary<string, object>? userProperties = default,
@@ -26,10 +26,8 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
         Optional<string?> language = default, Optional<string?> paying = default, Optional<string?> startVersion = default, DeviceInfo? deviceInfo = default,
         LocationInfo? locationInfo = default)
     {
-        var payload = new Dictionary<string, object?>
-        {
-            {_identifier.Key, _identifier.Value}
-        };
+        var payload = new Dictionary<string, object?>();
+        foreach (var identifier in _identifiers) payload.Add(identifier.Key, identifier.Value);
         
         void WriteOptional<T>(Optional<T> value, string key)
         {
@@ -81,7 +79,7 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
             payload.Add("dma", locationInfo.DMA.Value);
         }
         
-        await _amplitudeSender.Identify(payload, _logger);
+        await _amplitudeSender.Identify(payload);
     }
 
     public async ReturnType Event(string eventType, Optional<DateTime> time = default, IDictionary<string, object>? eventProperties = default,
@@ -91,12 +89,11 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
         AdvertiserIds? advertiserIds = default, Optional<int> eventId = default, Optional<long> sessionId = default, Optional<string> insertId = default, 
         PlanInfo? planInfo = default)
     {
-        var payload = new Dictionary<string, object?>
-        {
-            {_identifier.Key, _identifier.Value},
-            {"event_type", eventType}
-        };
+        var payload = new Dictionary<string, object?>();
         
+        foreach (var identifier in _identifiers) payload.Add(identifier.Key, identifier.Value);
+        payload.Add("event_type", eventType);
+
         void WriteOptional<T>(Optional<T> value, string key)
         {
             if (value.HasValue)
@@ -117,7 +114,7 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
         
         if (time.HasValue)
         {
-            payload.Add("time", time.Value.Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds);
+            payload.Add("time", (long)time.Value.Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds);
         }
         
         if (eventProperties != null)
@@ -177,6 +174,6 @@ public abstract class AmplitudeFor: IAmplitudeForTarget
                 });
         }
         
-        await _amplitudeSender.Event(payload, _logger);
+        await _amplitudeSender.Event(payload);
     }
 }

@@ -16,9 +16,9 @@ public class Amplitude : IAmplitude
         _sender = sender;
     }
 
-    public IAmplitudeForTarget ForUserId(string userId)
+    public IAmplitudeForTarget ForUserId(string userId, string? deviceId = default)
     {
-        return new AmplitudeForUser(_logger, _sender, userId);
+        return new AmplitudeForUser(_logger, _sender, userId, deviceId);
     }
 
     public IAmplitudeForTarget ForDeviceId(string deviceId)

@@ -1,4 +1,6 @@
 ﻿using System.Collections.Concurrent;
+using System.Net;
+using System.Text;
 #if NETSTANDARD2_0
 using Newtonsoft.Json;
 #else
@@ -12,9 +14,9 @@ using Timer = System.Timers.Timer;
 namespace Amplitude.Net;
 
 #if (NETSTANDARD2_0)
-using ReturnType = Task;
+using TaskType = Task;
 #else
-using ReturnType = ValueTask;
+using TaskType = ValueTask;
 #endif
 
 /// <summary>
@@ -29,70 +31,126 @@ public class AsyncAmplitudeSender : IAmplitudeSender,
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _apiKey;
-    private readonly ConcurrentQueue<(HttpRequestMessage Request, ILogger Logger)> _queue;
-    private readonly Timer _timer;
-    private readonly SemaphoreSlim _concurrencySemaphore;
+    private readonly ILogger<AsyncAmplitudeSender> _logger;
+    private readonly ConcurrentQueue<object> _identifyQueue, _eventQueue;
+    private readonly Timer _identifyTimer, _eventTimer;
+    private readonly SemaphoreSlim _identifySemaphore, _eventSemaphore;
 
-    public AsyncAmplitudeSender(IHttpClientFactory httpClientFactory, string apiKey)
+    public AsyncAmplitudeSender(IHttpClientFactory httpClientFactory, string apiKey, ILogger<AsyncAmplitudeSender> logger)
     {
         _httpClientFactory = httpClientFactory;
         _apiKey = apiKey;
-        _queue = new ConcurrentQueue<(HttpRequestMessage, ILogger)>();
+        _logger = logger;
+        _identifyQueue = new ConcurrentQueue<object>();
+        _eventQueue = new ConcurrentQueue<object>();
+        
 #if NET70
-        _timer = new Timer(TimeSpan.FromMilliseconds(50));
+        _identifyTimer = new Timer(TimeSpan.FromMilliseconds(50));
+        _eventTimer = new Timer(TimeSpan.FromMilliseconds(50));
 #else
-        _timer = new Timer(TimeSpan.FromMilliseconds(50).TotalMilliseconds);
+        _identifyTimer = new Timer(TimeSpan.FromMilliseconds(50).TotalMilliseconds);
+        _eventTimer = new Timer(TimeSpan.FromMilliseconds(50).TotalMilliseconds);
 #endif
-        _timer.AutoReset = true;
-        _timer.Elapsed += TimerOnElapsed;
-        _timer.Start();
-        _concurrencySemaphore = new SemaphoreSlim(10);
+
+        _identifyTimer.AutoReset = true;
+        _identifyTimer.Elapsed += IdentifyTimerOnElapsed;
+        _identifyTimer.Start();
+
+        _identifySemaphore = new SemaphoreSlim(2);
+        
+        _eventTimer.AutoReset = true;
+        _eventTimer.Elapsed += EventTimerOnElapsed;
+        _eventTimer.Start();
+
+        _eventSemaphore = new SemaphoreSlim(2);
     }
     
-    public AsyncAmplitudeSender(IHttpClientFactory httpClientFactory, IOptions<AmplitudeOptions> options)
-    :this(httpClientFactory, options?.Value?.ApiKey ?? throw new ArgumentException("No api key provided."))
+    public AsyncAmplitudeSender(IHttpClientFactory httpClientFactory, IOptions<AmplitudeOptions> options,  ILogger<AsyncAmplitudeSender> logger)
+        :this(httpClientFactory, options?.Value?.ApiKey ?? throw new ArgumentException("No api key provided."), logger)
     {
     }
 
-    private async void TimerOnElapsed(object? sender, ElapsedEventArgs e)
+    private async void IdentifyTimerOnElapsed(object? sender, ElapsedEventArgs e)
     {
-        if (_queue.IsEmpty) return;
-        
-        await _concurrencySemaphore.WaitAsync();
+        await ProcessIdentifyQueue();
+    }
+    
+    private async void EventTimerOnElapsed(object? sender, ElapsedEventArgs e)
+    {
+        await ProcessEventQueue();
+    }
+
+    private async Task ProcessIdentifyQueue()
+    {
+        if (_identifyQueue.IsEmpty) return;
+        await _identifySemaphore.WaitAsync();
         try
         {
-            if (!_queue.TryDequeue(out var request)) return;
-            try
+            const int max = 20;
+            var counter = 0;
+            var payloads = new List<object>();
+
+            while (counter++ < max)
             {
-                request.Logger.LogTrace("Sending Amplitude request");
-                await SendRequest(request.Request);
-                request.Logger.LogTrace("Amplitude request sent");
+                if (!_identifyQueue.TryDequeue(out var payload)) break;
+                payloads.Add(payload);
             }
-            catch(Exception ex)
-            {
-                request.Logger.LogError(ex, "Error delivering amplitude request");
-            }
+
+            if (payloads.Count == 0) return;
+            
+            _logger.LogTrace("Sending Identify request");
+            await SendIdentifyRequest(payloads.ToArray());
+            _logger.LogTrace("Identify request sent");
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex, "Error delivering amplitude identify request");
         }
         finally
         {
-            _concurrencySemaphore.Release();
+            _identifySemaphore.Release();
+        }
+    }
+    
+    private async Task ProcessEventQueue()
+    {
+        if (_eventQueue.IsEmpty) return;
+        await _eventSemaphore.WaitAsync();
+        try
+        {
+            const int max = 20;
+            var counter = 0;
+            var payloads = new List<object>();
+
+            while (counter++ < max)
+            {
+                if (!_eventQueue.TryDequeue(out var payload)) break;
+                payloads.Add(payload);
+            }
+
+            if (payloads.Count == 0) return;
+            
+            _logger.LogTrace("Sending Event request");
+            await SendEventRequest(payloads.ToArray());
+            _logger.LogTrace("Event request sent");
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex, "Error delivering amplitude event request");
+        }
+        finally
+        {
+            _eventSemaphore.Release();
         }
     }
 
-    private async Task SendRequest(HttpRequestMessage requestMessage)
-    {
-        using var httpClient = _httpClientFactory.CreateClient();
-        var response = await httpClient.SendAsync(requestMessage);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public ReturnType Identify(IDictionary<string, object?> payload, ILogger logger)
+    private async Task SendIdentifyRequest(object[] payloads)
     {
         const string url = "https://api2.amplitude.com/identify";
 #if NETSTANDARD2_0
-        var identificationBody = JsonConvert.SerializeObject(payload);
+        var identificationBody = JsonConvert.SerializeObject(payloads);
 #else
-        var identificationBody = JsonSerializer.Serialize(payload);
+        var identificationBody = JsonSerializer.Serialize(payloads);
 #endif
         
         var requestBody = new FormUrlEncodedContent(new KeyValuePair<string, string>[]
@@ -100,62 +158,128 @@ public class AsyncAmplitudeSender : IAmplitudeSender,
             new("api_key", _apiKey),
             new("identification", identificationBody)
         });
-        var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-        httpRequest.Content = requestBody;
-        
-        _queue.Enqueue((httpRequest, logger));
-        
-        return ReturnType.CompletedTask;
+
+        var count = 0;
+        var delay = TimeSpan.FromSeconds(15);
+        const int MaxRetries = 5;
+        using var httpClient = _httpClientFactory.CreateClient();
+
+        while (count++ < MaxRetries)
+        {
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            httpRequest.Content = requestBody;
+
+            var response = await httpClient.SendAsync(httpRequest);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return;
+            }
+            
+            if((int)response.StatusCode == 429)//too many requests
+            {
+                await Task.Delay(delay);
+            }
+            else
+            {
+                response.EnsureSuccessStatusCode();
+            }
+        }
     }
     
-    public ReturnType Event(IDictionary<string, object?> payload, ILogger logger)
+    private async Task SendEventRequest(object[] payloads)
     {
         const string url = "https://api2.amplitude.com/2/httpapi";
+        
+        var payload = new
+        {
+            api_key = _apiKey,
+            events = payloads
+        };
+#if NETSTANDARD2_0
+        var eventsBody = JsonConvert.SerializeObject(payload);
+#else
+        var eventsBody = JsonSerializer.Serialize(payload);
+#endif
+
+        var requestContent = new StringContent(eventsBody, Encoding.UTF8, "application/json");
+        
+        var count = 0;
+        var delay = TimeSpan.FromSeconds(15);
+        const int MaxRetries = 5;
+        using var httpClient = _httpClientFactory.CreateClient();
+
+        while (count++ < MaxRetries)
+        {
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            httpRequest.Content = requestContent;
+
+            var response = await httpClient.SendAsync(httpRequest);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return;
+            }
+            
+            if((int)response.StatusCode == 429)//too many requests
+            {
+                await Task.Delay(delay);
+            }
+            else
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                
+                response.EnsureSuccessStatusCode();
+            }
+        }
+    }
+
+    public TaskType Identify(IDictionary<string, object?> payload)
+    {
+#if NETSTANDARD2_0
+        var identificationBody = JsonConvert.SerializeObject(payload);
+#else
+        var identificationBody = JsonSerializer.Serialize(payload);
+#endif
+        
+        _identifyQueue.Enqueue(payload);
+        
+        return TaskType.CompletedTask;
+    }
+    
+    public TaskType Event(IDictionary<string, object?> payload)
+    {
 #if NETSTANDARD2_0
         var eventBody = JsonConvert.SerializeObject(new [] {payload});
 #else
         var eventBody = JsonSerializer.Serialize(new [] {payload});
 #endif
         
-        var requestBody = new FormUrlEncodedContent(new KeyValuePair<string, string>[]
-        {
-            new("api_key", _apiKey),
-            new("events", eventBody)
-        });
-        var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-        httpRequest.Content = requestBody;
+        _eventQueue.Enqueue(payload);
         
-        _queue.Enqueue((httpRequest, logger));
-        
-        return ReturnType.CompletedTask;
+        return TaskType.CompletedTask;
     }
 
 #if NETSTANDARD2_0
     public void Dispose()
     {
-        _timer.Dispose();
-        _concurrencySemaphore.Dispose();
+        _identifyTimer.Dispose();
+        _identifySemaphore.Dispose();
         
-        while (!_queue.IsEmpty)
+        while (!_identifyQueue.IsEmpty)
         {
-            if (_queue.TryDequeue(out var request))
-            {
-                Task.WaitAll(SendRequest(request.Request));
-            }
+            Task.WaitAll(ProcessIdentifyQueue());
         }
     }
 #else
     public async ValueTask DisposeAsync()
     {
-        _timer.Dispose();
-        _concurrencySemaphore.Dispose();
+        _identifyTimer.Dispose();
+        _identifySemaphore.Dispose();
 
-        while (!_queue.IsEmpty)
+        while (!_identifyQueue.IsEmpty)
         {
-            if (_queue.TryDequeue(out var request))
-            {
-                await SendRequest(request.Request);
-            }
+            await ProcessIdentifyQueue();
         }
     }
 #endif

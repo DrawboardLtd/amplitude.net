@@ -9,6 +9,6 @@ using ReturnType = ValueTask;
 
 public interface IAmplitudeSender
 {
-    ReturnType Identify(IDictionary<string, object?> payload, ILogger logger);
-    ReturnType Event(IDictionary<string, object?> payload, ILogger logger);
+    ReturnType Identify(IDictionary<string, object?> payload);
+    ReturnType Event(IDictionary<string, object?> payload);
 }
