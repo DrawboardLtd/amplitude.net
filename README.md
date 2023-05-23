@@ -1,6 +1,6 @@
 # Amplitude.Net
 
-This a dotnet library for making api calls to Amplitude (the analytics service). Currently it supports sending Identify requests only.
+This a dotnet library for making api calls to Amplitude (the analytics service). Currently it supports sending Identify requests and Events.
 
 ## Delivery 
 Instances of `IAmplitude` can be injected.
